@@ -1,0 +1,11 @@
+tree = RedBlackTree();
+tree = tree.insert(1);
+tree = tree.insert(10);
+tree = tree.insert(12);
+tree = tree.insert(-1);
+tree = tree.insert(100);
+tree = tree.insert(20);
+tree = tree.insert(5);
+tree = tree.insert(11);
+tree = tree.insert(56);
+tree.printTree();
