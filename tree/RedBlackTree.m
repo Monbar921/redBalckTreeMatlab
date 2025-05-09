@@ -1,14 +1,16 @@
 classdef RedBlackTree < handle
     properties
         root = {};
+        size = 0;
     end
     
     methods
-        function obj = insert(obj, key)
-            newNode = TreeNode(key);
+        function obj = insert(obj, key, value)
+            newNode = TreeNode(key, value);
             obj.root = obj.insertNode(obj.root, newNode);
             obj.root = fixViolations(obj.root, newNode);
             obj.root.color = "black"; % Ensure the root remains black
+            obj.size = obj.size + 1;
         end
 
         function node = get(obj, key)
@@ -21,6 +23,16 @@ classdef RedBlackTree < handle
             else
                 obj.printNode(obj.root, 0);
             end
+        end
+
+        function node = searchMinNode(obj, root)
+            if isempty(root) || isempty(root.left)
+                node = root;
+                return;
+            end
+            
+            % Recursive case: keep going left
+            node = obj.searchMinNode(root.left);
         end
     end
 
