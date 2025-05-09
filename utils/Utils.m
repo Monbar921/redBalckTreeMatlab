@@ -5,5 +5,13 @@ classdef Utils < handle
                 disp(outStr);
             end
         end
+
+        function result = getNodeKey(node, defaultResult)
+            try
+                result = node.key;
+            catch
+                result = defaultResult;
+            end
+        end
     end
 end

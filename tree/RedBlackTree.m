@@ -25,6 +25,10 @@ classdef RedBlackTree < handle
             end
         end
 
+        function [peredicateNode, nextNode] = getLessOrEqualsTo(obj, key)
+            [peredicateNode, nextNode] = obj.searchPredicateNode(obj.root, {}, key);
+        end
+
         function node = searchMinNode(obj, root)
             if isempty(root) || isempty(root.left)
                 node = root;
@@ -68,6 +72,36 @@ classdef RedBlackTree < handle
                 node = obj.searchNode(root.left, key);
             else
                 node = obj.searchNode(root.right, key);
+            end
+        end
+
+        function [node, nextNode] = searchPredicateNode(obj, root, prevNode, key)
+            if isempty(root)
+                if isempty(prevNode)
+                    node = root;
+                    nextNode = root;
+                elseif prevNode.key > key
+                    node = prevNode;
+                    nextNode = root;
+                else
+                    node = root;
+                    nextNode = prevNode;
+                end
+            elseif root.key == key
+                node = root;
+                nextNode = nan;
+            elseif ~isempty(prevNode) && key > root.key && key < prevNode.key ...
+                && isempty(root.right)
+                node = root;
+                nextNode = prevNode;
+            elseif ~isempty(prevNode) && key < root.key && key > prevNode.key ...
+                && isempty(root.left)
+                node = prevNode;
+                nextNode = root;
+            elseif key < root.key
+                [node, nextNode] = obj.searchPredicateNode(root.left, root, key);
+            else
+                [node, nextNode] = obj.searchPredicateNode(root.right, root, key);
             end
         end
 
