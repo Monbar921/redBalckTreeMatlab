@@ -1,49 +1,54 @@
 addpath('tree');
 addpath('unit');
 addpath('manager');
+addpath('utils');
 
 tree = RedBlackTree();
-tree.insert(1, 5);
-tree.insert(10, 13);
-tree.insert(10, 9);
-tree.insert(1, 10);
-tree.insert(100, 10);
-tree.insert(20, 10);
-tree.insert(5, 10);
-tree.insert(11, 10);
-tree.insert(56, 10);
-tree.insert(9, 3);
+inversedTree = RedBlackTree();
+TreeBuilder.addToTreeAndInversedTree(tree, inversedTree, 1, 5);
+TreeBuilder.addToTreeAndInversedTree(tree, inversedTree, 10, 13);
+TreeBuilder.addToTreeAndInversedTree(tree, inversedTree, 100, 10);
+TreeBuilder.addToTreeAndInversedTree(tree, inversedTree, 20, 10);
+TreeBuilder.addToTreeAndInversedTree(tree, inversedTree, 5, 2);
+TreeBuilder.addToTreeAndInversedTree(tree, inversedTree, 11, 10);
+TreeBuilder.addToTreeAndInversedTree(tree, inversedTree, 56, 10);
+TreeBuilder.addToTreeAndInversedTree(tree, inversedTree, 9, 7);
+
+tree2 = RedBlackTree();
+inversedTree2 = RedBlackTree();
+TreeBuilder.addToTreeAndInversedTree(tree2, inversedTree2, 4, 5);
+TreeBuilder.addToTreeAndInversedTree(tree2, inversedTree2, 10, 13);
+TreeBuilder.addToTreeAndInversedTree(tree2, inversedTree2, 100, 30);
+TreeBuilder.addToTreeAndInversedTree(tree2, inversedTree2, 20, 10);
+TreeBuilder.addToTreeAndInversedTree(tree2, inversedTree2, 5, 10);
+TreeBuilder.addToTreeAndInversedTree(tree2, inversedTree2, 11, 10);
+TreeBuilder.addToTreeAndInversedTree(tree2, inversedTree2, 1, 10);
+TreeBuilder.addToTreeAndInversedTree(tree2, inversedTree2, 9, 3);
+
+tree.printTree();
 
 unit1 = HydroelectricUnit('GA1');
 unit1.setCharacteristic(3, tree);
-
-
-tree2 = RedBlackTree();
-tree2.insert(4, 2);
-tree2.insert(10, 13);
-tree2.insert(10, 9);
-tree2.insert(3, 10);
-tree2.insert(100, 10);
-tree2.insert(20, 10);
-tree2.insert(5, 10);
-tree2.insert(11, 10);
-tree2.insert(56, 10);
-tree2.insert(9, 4);
+unit1.setInversedCharacteristic(3, inversedTree);
 
 unit2 = HydroelectricUnit('GA2');
 unit2.setCharacteristic(3, tree2);
+unit2.setInversedCharacteristic(3, inversedTree2);
 
 manager = PowerManager();
 manager.addUnit(unit1);
 manager.addUnit(unit2);
 
-[minWater, conditionsMap] = manager.dispatchActivePower(10, 3);
-disp(minWater);
+%tree.traverseTreeInOrder(tree.searchMinNode(tree.root));
 
-allKeys = keys(conditionsMap);
 
-% Print all keys
-disp(allKeys)
-%charec.printTree();
-%disp(length(unit1.characteristics));
-%tree.printTree();
+selectedUnits = manager.dispatchActivePower(3, 40);
+
+disp('result');
+minTask = manager.extractMinFromTask(selectedUnits, 40);
+manager.printSelectedTask(minTask);
+
+manager.printDispatchTask(selectedUnits);
+
+%fprintf('minWater = %g\n', minWater);
+

@@ -5,8 +5,20 @@ classdef RedBlackTree < handle
     end
     
     methods
-        function obj = insert(obj, key, value)
-            newNode = TreeNode(key, value);
+        function obj = insert(obj, key, value, inversed)
+            arguments
+                obj;
+                key double;
+                value double;
+                inversed logical  = false;
+            end
+
+            if inversed
+                newNode = TreeNode(value, key);
+            else
+                newNode = TreeNode(key, value);
+            end
+            
             obj.root = obj.insertNode(obj.root, newNode);
             obj.root = fixViolations(obj.root, newNode);
             obj.root.color = "black"; % Ensure the root remains black
@@ -37,6 +49,14 @@ classdef RedBlackTree < handle
             
             % Recursive case: keep going left
             node = obj.searchMinNode(root.left);
+        end
+
+        function currentNode = traverseTreeInOrderBeforeValue(obj, minNode, foundValue)
+            currentNode = minNode;
+            while ~isempty(currentNode) && currentNode.value > foundValue                
+                % Move to the successor
+                currentNode = obj.findSuccessor(currentNode);
+            end
         end
     end
 
@@ -77,19 +97,10 @@ classdef RedBlackTree < handle
 
         function [node, nextNode] = searchPredicateNode(obj, root, prevNode, key)
             if isempty(root)
-                if isempty(prevNode)
-                    node = root;
-                    nextNode = root;
-                elseif prevNode.key > key
-                    node = prevNode;
-                    nextNode = root;
-                else
-                    node = root;
-                    nextNode = prevNode;
-                end
+                [node, nextNode] = obj.fillNodes(root, prevNode, key);
             elseif root.key == key
                 node = root;
-                nextNode = nan;
+                nextNode = {};
             elseif ~isempty(prevNode) && key > root.key && key < prevNode.key ...
                 && isempty(root.right)
                 node = root;
@@ -102,6 +113,22 @@ classdef RedBlackTree < handle
                 [node, nextNode] = obj.searchPredicateNode(root.left, root, key);
             else
                 [node, nextNode] = obj.searchPredicateNode(root.right, root, key);
+            end
+        end
+
+        function [node, nextNode] = fillNodes(obj, root, prevNode, key)
+            if isempty(prevNode)
+                node = root;
+                nextNode = root;
+            elseif prevNode.key > key
+                node = prevNode;
+                while ~isempty(node) && ~isempty(node.parent) && node.key > key
+                    node = node.parent;
+                end
+                nextNode = prevNode;
+            else
+                node = root;
+                nextNode = prevNode;
             end
         end
 
@@ -126,6 +153,26 @@ classdef RedBlackTree < handle
                 else
                     root.right = obj.insertNode(root.right, node);
                     root.right.parent = root; % 
+                end
+            end
+        end
+
+        function successor = findSuccessor(obj, node)
+            %disp(node.key);
+            if ~isempty(node.right)
+                % Successor is the leftmost node in the right subtree
+                successor = node.right;
+                %disp(node.right.key);
+                while ~isempty(successor.left)
+                    %disp(successor.left.key);
+                    successor = successor.left;
+                end
+            else
+                % Successor is the nearest ancestor where node is in the left subtree
+                successor = node.parent;
+                while ~isempty(successor) && ~isempty(node) && ~isempty(successor.right) && node == successor.right
+                    node = successor;
+                    successor = successor.parent;
                 end
             end
         end
