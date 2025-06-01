@@ -37,10 +37,15 @@ classdef PowerManager < handle
                         minKey = key;
                     end
                 end
-                minTask = selectedTask(minKey);
+
+                try
+                    minTask = selectedTask(minKey);
+                catch
+                    minTask = {};
+                end
             end
         end
-    
+
         function selectedTask = dispatchActivePower(obj, ...
                 waterPressure, powerTask, deviation)
             arguments
@@ -49,46 +54,34 @@ classdef PowerManager < handle
                 powerTask double;
                 deviation double = obj.deviation;
             end
-            
-            remainedPowerTask = powerTask;
-            processedUnits = containers.Map('KeyType', 'char', 'ValueType', 'any');
+
+            minWaterTaskHandler = TaskHandler(waterPressure, powerTask);
+            maxWaterTaskHandler = TaskHandler(waterPressure, powerTask);
+            maxPowerTaskHandler = TaskHandler(waterPressure, powerTask);
             selectedTask = containers.Map('KeyType', 'char', 'ValueType', 'any');
-            selectedUnits = SelectedUnit.empty(0, 0);
             resCounter = 0;
 
             Utils.debug(sprintf(['dispatchActivePower: start dispatch active power for waterPressure = %f, ' ...
                 'powerTask = %f, deviation = %f'], waterPressure, powerTask, deviation), true);
 
-            %1) find alone unit consumption
-
-            %2) find the miin n-th min unit consumption and compete with n+1 to power task 
             for idx = 1:length(obj.units)
-               Utils.debug(sprintf('dispatchActivePower: start loop for unit %d, remainedPowerTask = %f', idx, remainedPowerTask), true);
-               [resCounter, selectedTask] = calculateAloneUnit(obj, waterPressure, powerTask, obj.units(idx), selectedTask, resCounter);
+               Utils.debug(sprintf('dispatchActivePower: start loop for unit %d, remainedPowerTask = %f', idx, minWaterTaskHandler.powerTask), true);
+               if length(obj.units) > 1
+                   [resCounter, selectedTask] = obj.calculateMinWaterUnit(minWaterTaskHandler, selectedTask, resCounter);
+                   %[resCounter, selectedTask] = obj.calculateMaxPowerUnit(maxPowerTaskHandler, selectedTask, resCounter);
+                   %[resCounter, selectedTask] = obj.calculateMaxWaterUnit(maxWaterTaskHandler, selectedTask, resCounter);
+               end
 
-               if length(obj.units) > 1 && remainedPowerTask > 0
-                   if remainedPowerTask ~= powerTask && remainedPowerTask > 0
-                       for aloneIdx = idx:length(obj.units)
-                           [resCounter, selectedTask] = calculateAloneUnit(obj, waterPressure, remainedPowerTask, obj.units(aloneIdx), selectedTask, resCounter, selectedUnits);
-                       end
-                   end
+               %1) find alone unit consumption
+               [resCounter, selectedTask] = calculateAloneWaterUnit(obj, minWaterTaskHandler, selectedTask, resCounter);
 
-                   [minWaterPoint, minUnit] = obj.getMinWaterUnit(waterPressure, remainedPowerTask, processedUnits);
-                   
-                   if ~isempty(minUnit)
-                      selectedUnits(end+1) = SelectedUnit(minWaterPoint.key, minWaterPoint.value, minUnit);
-                      remainedPowerTask = remainedPowerTask - minWaterPoint.key;
-                      if remainedPowerTask <= 0
-                          selectedTask(num2str(resCounter)) = selectedUnits;
-                          resCounter = resCounter + 1;
-                      end
-
-                      processedUnits(minUnit.getName()) = true;
-                   end
+               if length(obj.units) > 1
+                   [resCounter, selectedTask] = obj.calculateAloneWaterUnit(maxPowerTaskHandler, selectedTask, resCounter);
+                   %[resCounter, selectedTask] = obj.calculateAloneWaterUnit(maxWaterTaskHandler, selectedTask, resCounter);
                end
             end
 
-            Utils.debug(sprintf('dispatchActivePower: remainedPowerTask = %f', remainedPowerTask), true);
+            Utils.debug(sprintf('dispatchActivePower: remainedPowerTask = %f', minWaterTaskHandler.powerTask), true);
         end
 
         function printDispatchTask(obj, selectedUnitsMap)
@@ -118,20 +111,30 @@ classdef PowerManager < handle
     end
 
     methods (Access = private)
-        function [resCounter, selectedTask] = calculateAloneUnit(obj, waterPressure, powerTask, unit, selectedTask, resCounter, selectedUnits)
-            if nargin == 6
-                selectedAloneUnits = SelectedUnit.empty(0, 0);
-            else
-                selectedAloneUnits = selectedUnits;
+        function [resCounter, selectedTask] = calculateAloneWaterUnit(obj, taskHandler, selectedTask, resCounter)
+            for idx = 1:length(obj.units)
+                if ~obj.units(idx).getIsActive() || obj.getValueFromMap(taskHandler.processedUnits, obj.units(idx).getName)
+                    continue;
+                end
+
+                [minWaterAlonePoint, minAloneUnit] = obj.getMinWaterAloneUnit(taskHandler.waterPressure, taskHandler.powerTask, obj.units(idx));
+                [resCounter, selectedTask] =  taskHandler.processAloneWaterUnit(minAloneUnit, minWaterAlonePoint, selectedTask, resCounter);
             end
-            
-            [minWaterAlonePoint, minAloneUnit] = obj.getMinWaterAloneUnit(waterPressure, powerTask, unit);
-              
-            if ~isempty(minAloneUnit)
-              selectedAloneUnits(end+1) = SelectedUnit(minWaterAlonePoint.key, minWaterAlonePoint.value, minAloneUnit);
-              selectedTask(num2str(resCounter)) = selectedAloneUnits;
-              resCounter = resCounter + 1;
-            end
+        end
+
+        function [resCounter, selectedTask] = calculateMinWaterUnit(obj, taskHandler, selectedTask, resCounter)
+           [minWaterPoint, minUnit] = obj.getMinWaterUnit(taskHandler);
+           [resCounter, selectedTask] = taskHandler.processWaterUnitTask(minUnit, minWaterPoint, selectedTask, resCounter);
+        end
+
+        function [resCounter, selectedTask] = calculateMaxWaterUnit(obj, taskHandler, selectedTask, resCounter)
+           [waterPoint, unit] = obj.getMaxWaterUnit(taskHandler);
+           [resCounter, selectedTask] = taskHandler.processWaterUnitTask(unit, waterPoint, selectedTask, resCounter);
+        end
+
+        function [resCounter, selectedTask] = calculateMaxPowerUnit(obj, taskHandler, selectedTask, resCounter)
+           [waterPoint, unit] = obj.getMaxPowerUnit(taskHandler);
+           [resCounter, selectedTask] = taskHandler.processWaterUnitTask(unit, waterPoint, selectedTask, resCounter);
         end
 
         function [minWaterPoint, minUnit] = getMinWaterAloneUnit(obj, waterPressure, powerTask, unit)
@@ -160,29 +163,29 @@ classdef PowerManager < handle
             end
         end
 
-        function [minWaterPoint, minUnit] = getMinWaterUnit(obj, waterPressure, powerTask, processedUnits)
+        function [minWaterPoint, minUnit] = getMinWaterUnit(obj, taskHandler)
             minWaterPoint = {};
             minUnit = {};
             minWater = inf;
             for idx = 1:length(obj.units)
                 unit = obj.units(idx);
                 
-                if ~unit.getIsActive() || obj.getValueFromMap(processedUnits, unit.getName)
+                if ~unit.getIsActive() || obj.getValueFromMap(taskHandler.processedUnits, unit.getName)
                     continue;
                 end
 
-                inversedTree = unit.getInversedCharacteristic(waterPressure);
+                inversedTree = unit.getInversedCharacteristic(taskHandler.waterPressure);
                 if ~isempty(inversedTree)
                     node = inversedTree.searchMinNode(inversedTree.root);
 
                     Utils.debug(sprintf('getMinWaterUnit: minNode node.key %f, node.value %f, unit %s', ...
                         node.value, node.key, unit.getName()), true);
 
-                    node = obj.correctMinNodeToPowertTask(inversedTree, powerTask, node);
+                    node = obj.correctMinNodeToPowertTask(inversedTree, taskHandler.powerTask, node);
 
                     if isempty(node)
                         Utils.debug(sprintf('getMinWaterUnit: can not find point in characteristic'), true);
-                        processedUnits(unit.getName()) = true;
+                        taskHandler.addProcessedUnits(unit.getName());
                         continue;
                     end
 
@@ -197,7 +200,87 @@ classdef PowerManager < handle
                         minWaterPoint.key, minWaterPoint.value), true);
                     end
                 else
-                    processedUnits(unit.getName()) = true;
+                    taskHandler.addProcessedUnits(unit.getName());
+                end
+            end
+        end
+
+        function [maxWaterPoint, maxUnit] = getMaxWaterUnit(obj, taskHandler)
+            maxWaterPoint = {};
+            maxUnit = {};
+            maxWater = 0;
+            for idx = 1:length(obj.units)
+                unit = obj.units(idx);
+                
+                if ~unit.getIsActive() || obj.getValueFromMap(taskHandler.processedUnits, unit.getName)
+                    continue;
+                end
+
+                inversedTree = unit.getInversedCharacteristic(taskHandler.waterPressure);
+                if ~isempty(inversedTree)
+                    node = inversedTree.searchMinNode(inversedTree.root);
+
+                    Utils.debug(sprintf('getMaxWaterUnit: minNode node.key %f, node.value %f, unit %s', ...
+                        node.value, node.key, unit.getName()), true);
+
+                    node = obj.correctMinNodeToPowertTask(inversedTree, taskHandler.powerTask, node);
+
+                    if isempty(node)
+                        Utils.debug(sprintf('getMaxWaterUnit: can not find point in characteristic'), true);
+                        taskHandler.addProcessedUnits(unit.getName());
+                        continue;
+                    end
+
+                    Utils.debug(sprintf('getMaxWaterUnit: corrected minNode node.key %f, node.value %f', ...
+                        node.value, node.key), true);
+
+                    if node.key >= maxWater
+                        maxWaterPoint = struct('key', node.value, 'value', node.key);
+                        maxUnit = unit;
+                        maxWater = node.key;
+                        Utils.debug(sprintf('getMaxWaterUnit: new min point node.key %f, node.value %f', ...
+                        maxWaterPoint.key, maxWaterPoint.value), true);
+                    end
+                else
+                    taskHandler.addProcessedUnits(unit.getName());
+                end
+            end
+        end
+
+        function [waterPoint, selectedUnit] = getMaxPowerUnit(obj, taskHandler)
+            waterPoint = {};
+            selectedUnit = {};
+            minWater = inf;
+            for idx = 1:length(obj.units)
+                unit = obj.units(idx);
+                
+                if ~unit.getIsActive() || obj.getValueFromMap(taskHandler.processedUnits, unit.getName)
+                    continue;
+                end
+
+                tree = unit.getCharacteristic(taskHandler.waterPressure);
+                if ~isempty(tree)
+                    [predicateNode, nextNode] = tree.getLessOrEqualsTo(taskHandler.powerTask);
+
+                    if isinf(Utils.getNodeKey(predicateNode, inf)) && ~isinf(Utils.getNodeKey(nextNode, inf))
+                        predicateNode = nextNode;
+                    else
+                        Utils.debug(sprintf('getMaxPowerUnit: can not find point'), true);
+                        continue;
+                    end
+
+                    Utils.debug(sprintf('getMaxPowerUnit: minNode node.key %f, node.value %f, unit %s', ...
+                        predicateNode.key, predicateNode.value, unit.getName()), true);
+
+                    if predicateNode.value < minWater
+                        waterPoint = struct('key', predicateNode.key, 'value', predicateNode.value);
+                        selectedUnit = unit;
+                        minWater = predicateNode.value;
+                        Utils.debug(sprintf('getMaxPowerUnit: new water point node.key %f, node.value %f', ...
+                        waterPoint.key, waterPoint.value), true);
+                    end
+                else
+                    taskHandler.addProcessedUnits(unit.getName());
                 end
             end
         end
@@ -216,11 +299,11 @@ classdef PowerManager < handle
 
             if ~isinf(nodeKey) && nodeKey == powerTask
                 resultPoint = struct('key', powerTask, 'value', node.value);
-            elseif ~isinf(nodeKey) && ~isinf(nextNodeKey)
+            elseif ~isinf(nodeKey) && ~isinf(nextNodeKey) && (powerTask >= nodeKey && powerTask <= nextNodeKey)
                 result = node.value + ((nextNode.value - node.value)/(nextNode.key - node.key))*(powerTask - node.key);
                 resultPoint = struct('key', powerTask, 'value', result);
             elseif isinf(nodeKey) && ~isinf(nextNodeKey)
-                resultPoint = struct('key', node.key, 'value', nextNode.value);
+                resultPoint = struct('key', nextNodeKey, 'value', nextNode.value);
             elseif ~isinf(nodeKey) && isinf(nextNodeKey)
                 resultPoint = struct('key', powerTask, 'value', inf);
             else

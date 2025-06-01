@@ -37,8 +37,8 @@ classdef RedBlackTree < handle
             end
         end
 
-        function [peredicateNode, nextNode] = getLessOrEqualsTo(obj, key)
-            [peredicateNode, nextNode] = obj.searchPredicateNode(obj.root, {}, key);
+        function [predicateNode, nextNode] = getLessOrEqualsTo(obj, key)
+            [predicateNode, nextNode] = obj.searchPredicateNode(obj.root, {}, key);
         end
 
         function node = searchMinNode(obj, root)
