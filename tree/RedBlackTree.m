@@ -9,7 +9,7 @@ classdef RedBlackTree < handle
             arguments
                 obj;
                 key double;
-                value double;
+                value;
                 inversed logical  = false;
             end
 
@@ -57,6 +57,33 @@ classdef RedBlackTree < handle
                 % Move to the successor
                 currentNode = obj.findSuccessor(currentNode);
             end
+        end
+
+        function node = traverseInOrder(obj, node)
+            if ~isempty(node)
+                node = obj.findSuccessor(node);
+            end
+        end
+
+        function node = traverseInOrderWithAction(obj, currentNode)
+            if isempty(currentNode)
+                % Start from the minimum node if none provided
+                currentNode = obj.searchMinNode(obj.root);
+            end
+            
+            while ~isempty(currentNode)
+                % Perform the action with the current node
+                shouldContinue = actionFunction(currentNode);
+                
+                if ~shouldContinue
+                    break;
+                end
+                
+                % Move to the successor
+                currentNode = obj.findSuccessor(currentNode);
+            end
+            
+            node = currentNode;
         end
     end
 

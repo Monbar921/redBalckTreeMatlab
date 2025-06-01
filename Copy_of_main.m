@@ -110,15 +110,9 @@ manager.addUnit(unit3);
 
 %tree.traverseTreeInOrder(tree.searchMinNode(tree.root));
 
-
-selectedUnits = manager.dispatchActivePower(3, 80);
-
-disp('result');
-minTask = manager.extractMinFromTask(selectedUnits, 80);
-
-manager.printDispatchTask(selectedUnits);
-disp('min');
-manager.printSelectedTask(minTask);
+distributions = manager.makeDistributions(3, 108);
+%manager.printDistributions(distributions);
+manager.extractMinDistribution(distributions);
 
 %fprintf('minWater = %g\n', minWater);
 
